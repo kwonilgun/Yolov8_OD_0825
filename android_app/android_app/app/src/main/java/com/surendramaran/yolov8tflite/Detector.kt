@@ -3,6 +3,7 @@ package com.surendramaran.yolov8tflite
 import android.content.Context
 import android.graphics.Bitmap
 import android.os.SystemClock
+import android.util.Log
 import org.tensorflow.lite.DataType
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.support.common.FileUtil
@@ -97,9 +98,14 @@ class Detector(
 
 
         if (bestBoxes == null) {
+            Log.d("debug3", "bestBoxes is null")
             detectorListener.onEmptyDetect()
             return
         }
+        else{
+            Log.d("debug4", "bestBoxes is not null")
+        }
+
 
         detectorListener.onDetect(bestBoxes, inferenceTime)
     }
