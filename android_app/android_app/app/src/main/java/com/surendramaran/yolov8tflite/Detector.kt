@@ -98,16 +98,19 @@ class Detector(
 
 
         if (bestBoxes == null) {
-            Log.d("debug3", "bestBoxes is null")
+//            Log.d("debug3", "bestBoxes is null")
+//            detectorListener.onEnableCameraButton(false) // Disable camera button
             detectorListener.onEmptyDetect()
             return
         }
         else{
             Log.d("debug4", "bestBoxes is not null")
+//            detectorListener.onEnableCameraButton(true) // Enable camera button
+
         }
 
 
-        detectorListener.onDetect(bestBoxes, inferenceTime)
+        detectorListener.onDetect(bestBoxes, inferenceTime, true)
     }
 
     private fun bestBox(array: FloatArray) : List<BoundingBox>? {
@@ -193,7 +196,8 @@ class Detector(
 
     interface DetectorListener {
         fun onEmptyDetect()
-        fun onDetect(boundingBoxes: List<BoundingBox>, inferenceTime: Long)
+        fun onDetect(boundingBoxes: List<BoundingBox>, inferenceTime: Long, enable: Boolean)
+        fun onEnableCameraButton(enable: Boolean) // New method
     }
 
     companion object {

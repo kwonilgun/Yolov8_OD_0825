@@ -1,17 +1,26 @@
 package com.surendramaran.yolov8tflite
 
 import android.Manifest
+import android.content.ContentValues
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.provider.MediaStore
 import android.util.Log
+import android.widget.Button
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
@@ -19,6 +28,9 @@ import androidx.core.content.ContextCompat
 import com.surendramaran.yolov8tflite.Constants.LABELS_PATH
 import com.surendramaran.yolov8tflite.Constants.MODEL_PATH
 import com.surendramaran.yolov8tflite.databinding.ActivityMainBinding
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -38,10 +50,27 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
 
     private lateinit var cameraExecutor: ExecutorService
 
+    private var imageCapture: ImageCapture? = null
+    private lateinit var cameraButton: Button // Assuming you have a Button named cameraButton
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        cameraButton = binding.cameraButton // Assuming your Button is bound this way
+        cameraButton.setOnClickListener {
+
+            if(cameraButton.isEnabled){
+                takePhoto()
+            } else{
+                Log.d("debug4", "camera is disabled")
+            }
+
+        }
+
+        cameraButton.isEnabled = false
+//        onEnableButton(false)
 
         detector = Detector(baseContext, MODEL_PATH, LABELS_PATH, this)
         detector.setup()
@@ -133,9 +162,14 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
                 matrix, true
             )
 
-            Log.d("debug 2", " image detector ..")
+//            Log.d("debug 2", " image detector ..")
             detector.detect(rotatedBitmap)
         }
+
+        imageCapture = ImageCapture.Builder()
+            .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+            .setTargetRotation(binding.viewFinder.display.rotation)
+            .build()
 
         cameraProvider.unbindAll()
 
@@ -146,7 +180,8 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
                 this,
                 cameraSelector,
                 preview,
-                imageAnalyzer
+                imageAnalyzer,
+                imageCapture
             )
 
             preview?.setSurfaceProvider(binding.viewFinder.surfaceProvider)
@@ -154,6 +189,84 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
             Log.e(TAG, "Use case binding failed", exc)
         }
     }
+
+    private fun takePhoto() {
+
+        Log.d("debug5", "takePhoto")
+        val imageCapture = imageCapture ?: return
+
+        // Create time stamped name and MediaStore entry.
+        // MediaStore 콘텐츠 값을 만든다.
+        // MediaStore의 표시 이름이 고유하도록 현재 시간을 기준으로 타임스탬프를 사용한다.
+        val name = SimpleDateFormat(FILENAME_FORMAT, Locale.KOREA)
+            .format(System.currentTimeMillis())
+
+        // ContentValues를 사용하여 이미지에 대한 메타데이터 설정
+        val contentValues = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+            put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+            // Android Q 이상에서는 RELATIVE_PATH를 사용하여 저장 경로 지정
+            if(Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
+                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/CameraX-Image")
+            }
+        }
+
+        // Create output options object which contains file + metadata
+        // OutputFileOptions 객체를 생성.
+        // 이미지 저장 옵션 설정. MediaStore를 통해 이미지 저장 위치와 메타데이터 지정
+        // 이 객체에서 원하는 출력 방법을 지정할 수 있다.
+        val outputOptions = ImageCapture.OutputFileOptions
+            .Builder(contentResolver,
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                contentValues)
+            .build()
+
+        // Set up image capture listener, which is triggered after photo has
+        // been taken
+        // takePicture()를 호출한다. 이미지 캡처 및 저장
+        // outputOptions, 실행자, 이미지가 저장될 때 콜백을 전달
+        imageCapture.takePicture(
+            outputOptions,
+            ContextCompat.getMainExecutor(this),
+            object : ImageCapture.OnImageSavedCallback {
+                override fun onError(exc: ImageCaptureException) {
+                    Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
+                }
+
+                // 캡처에 실패하지 않으면 사진을 저장하고 완료되었다는 토스트 메시지를 표시한다.
+                override fun
+                        onImageSaved(output: ImageCapture.OutputFileResults){
+                    val msg = "Photo capture succeeded: ${output.savedUri}"
+                    Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
+                    Log.d(TAG, msg)
+                }
+            }
+        )
+    }
+
+    private fun onEnableButton(enable: Boolean) {
+        if (!cameraButton.isEnabled) {
+            cameraButton.isEnabled = enable
+
+            // 버튼의 배경색을 활성화/비활성화에 따라 변경
+            val backgroundColor = if (enable) {
+                ContextCompat.getColor(this, R.color.button_color_enabled)
+            } else {
+                ContextCompat.getColor(this, R.color.button_color_disabled)
+            }
+            cameraButton.setBackgroundColor(backgroundColor)
+
+            // 버튼의 텍스트 색상도 활성화/비활성화에 따라 변경
+            val textColor = if (enable) {
+                ContextCompat.getColor(this, R.color.button_text_color_enabled)
+            } else {
+                ContextCompat.getColor(this, R.color.button_text_color_disabled)
+            }
+            cameraButton.setTextColor(textColor)
+        }
+    }
+
+
 
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
         ContextCompat.checkSelfPermission(baseContext, it) == PackageManager.PERMISSION_GRANTED
@@ -181,23 +294,59 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
 
     companion object {
         private const val TAG = "Camera"
+        private const val FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
         private const val REQUEST_CODE_PERMISSIONS = 10
-        private val REQUIRED_PERMISSIONS = mutableListOf (
-            Manifest.permission.CAMERA
-        ).toTypedArray()
+        private val REQUIRED_PERMISSIONS =
+            mutableListOf (
+                Manifest.permission.CAMERA,
+                Manifest.permission.RECORD_AUDIO
+            ).apply {
+                if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+                    add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                }
+            }.toTypedArray()
     }
 
     override fun onEmptyDetect() {
         binding.overlay.invalidate()
     }
 
-    override fun onDetect(boundingBoxes: List<BoundingBox>, inferenceTime: Long) {
+    override fun onDetect(boundingBoxes: List<BoundingBox>, inferenceTime: Long, enable: Boolean) {
+
+
         runOnUiThread {
             binding.inferenceTime.text = "${inferenceTime}ms"
             binding.overlay.apply {
                 setResults(boundingBoxes)
                 invalidate()
             }
+
+//            if(!cameraButton.isEnabled) {
+//                cameraButton.isEnabled = enable
+//                onEnableButton(enable)
+//            }
+
+            // Schedule a photo to be taken 500ms after detection
+            if(!cameraButton.isEnabled){
+                Handler(Looper.getMainLooper()).postDelayed({
+//                    takePhoto()
+                    cameraButton.isEnabled = enable
+//                    onEnableButton(enable)
+                }, 10)
+            }
+
         }
+    }
+
+    override fun onEnableCameraButton(enable: Boolean) {
+
+        if(!cameraButton.isEnabled){
+            cameraButton.isEnabled = enable
+            onEnableButton(enable)
+        } else {
+            cameraButton.isEnabled = enable
+            onEnableButton(enable)
+        }
+
     }
 }
