@@ -2,8 +2,12 @@ package com.surendramaran.yolov8tflite
 
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import com.google.android.material.snackbar.Snackbar
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.graphics.drawable.toBitmap
 import androidx.navigation.findNavController
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.navigateUp
@@ -29,6 +33,10 @@ class DisplayPhotoActivity : AppCompatActivity() {
 // Get the photo URI from the intent
 
         val photoUri: Uri? = intent.getParcelableExtra("photo_uri")
+        val boundingBoxes: ArrayList<BoundingBox>? =
+            intent.getParcelableArrayListExtra<Bundle>("bounding_boxes")?.toBoundingBoxList() as ArrayList<BoundingBox>?
+
+
 
         // Display the photo in the ImageView
 //        photoUri?.let { ... }는 photoUri가 null이 아닌지 확인하고, null이 아니면 let 블록 안의 코드를 실행합니다. 이때 photoUri는 it으로 참조됩니다.
@@ -40,6 +48,29 @@ class DisplayPhotoActivity : AppCompatActivity() {
         // Close the activity when the ImageView is clicked, returning to the camera
         binding.photoImageView.setOnClickListener {
             finish()
+        }
+
+        runOnUiThread {
+
+//            binding.overlay.apply {
+//                Log.d("overlay boundingBox",  "$boundingBoxes")
+//                boundingBoxes?.let { setResults(it) }
+//                invalidate()
+//            }
+            binding.overlayCarving.apply{
+                Log.d("overlay carving bouningBox",  "$boundingBoxes")
+
+                // Obtain or create the Bitmap. This example assumes you're creating a bitmap from the ImageView.
+                val bitmap = binding.photoImageView.drawable.toBitmap() // Convert the ImageView's drawable to Bitmap
+
+                boundingBoxes?.let { setBoundingBoxes(it, bitmap) } // Pass the bitmap along with boundingBoxes
+            }
+
+//            binding.overlay_carving.apply {
+//                Log.d("onDetect bounding box",  "$boundingBoxes")
+//                boundingBoxes?.let { setResults(it) }
+//                invalidate()
+//            }
         }
 
 

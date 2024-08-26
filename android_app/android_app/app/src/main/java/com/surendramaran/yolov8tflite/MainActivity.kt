@@ -56,6 +56,9 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
     private var imageCapture: ImageCapture? = null
     private lateinit var cameraButton: Button // Assuming you have a Button named cameraButton
 
+    // Add this variable to hold boundingBoxes
+    private var detectedBoundingBoxes: List<BoundingBox>? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -65,7 +68,7 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
         cameraButton.setOnClickListener {
 
             if(cameraButton.isEnabled){
-                takePhoto()
+                detectedBoundingBoxes?.let { it1 -> takePhoto(it1) }
             } else{
                 Log.d("debug4", "camera is disabled")
             }
@@ -193,7 +196,7 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
         }
     }
 
-    private fun takePhoto() {
+    private fun takePhoto(boundingBoxes: List<BoundingBox>) {
 
         Log.d("debug5", "takePhoto")
         val imageCapture = imageCapture ?: return
@@ -246,9 +249,15 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
 
 //                    stopCameraAndShowImage(savedUri)
 
+
+
                     // Start the DisplayPhotoActivity and pass the photo URI
                     val intent = Intent(this@MainActivity, DisplayPhotoActivity::class.java).apply {
                         putExtra("photo_uri", savedUri)
+//                        putParcelableArrayListExtra("bounding_boxes", ArrayList(boundingBoxes ?: emptyList()))
+
+                        putParcelableArrayListExtra("bounding_boxes", boundingBoxes.toParcelableArrayList())
+
                     }
                     startActivity(intent)
                 }
@@ -346,7 +355,8 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
                 invalidate()
             }
 
-
+            // Save boundingBoxes to a class-level variable
+            detectedBoundingBoxes = boundingBoxes
 
             // Schedule a photo to be taken 500ms after detection
             if(!cameraButton.isEnabled){
