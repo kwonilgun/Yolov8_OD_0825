@@ -2,15 +2,18 @@ package com.surendramaran.yolov8tflite
 
 import android.Manifest
 import android.content.ContentValues
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
+import android.view.View
 import android.widget.Button
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -236,12 +239,33 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
                 // 캡처에 실패하지 않으면 사진을 저장하고 완료되었다는 토스트 메시지를 표시한다.
                 override fun
                         onImageSaved(output: ImageCapture.OutputFileResults){
+                    val savedUri = output.savedUri ?: return
                     val msg = "Photo capture succeeded: ${output.savedUri}"
                     Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
                     Log.d(TAG, msg)
+
+//                    stopCameraAndShowImage(savedUri)
+
+                    // Start the DisplayPhotoActivity and pass the photo URI
+                    val intent = Intent(this@MainActivity, DisplayPhotoActivity::class.java).apply {
+                        putExtra("photo_uri", savedUri)
+                    }
+                    startActivity(intent)
                 }
             }
         )
+    }
+
+    private fun stopCameraAndShowImage(imageUri: Uri) {
+        // Unbind all camera use cases
+        cameraProvider?.unbindAll()
+
+        // Hide the viewFinder (where the camera preview is shown)
+        binding.viewFinder.visibility = View.GONE
+
+//        // Show the captured image
+//        binding.capturedImageView.visibility = View.VISIBLE
+//        binding.capturedImageView.setImageURI(imageUri)
     }
 
     private fun onEnableButton(enable: Boolean) {
@@ -317,14 +341,12 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
         runOnUiThread {
             binding.inferenceTime.text = "${inferenceTime}ms"
             binding.overlay.apply {
+                Log.d("onDetect bounding box",  "$boundingBoxes")
                 setResults(boundingBoxes)
                 invalidate()
             }
 
-//            if(!cameraButton.isEnabled) {
-//                cameraButton.isEnabled = enable
-//                onEnableButton(enable)
-//            }
+
 
             // Schedule a photo to be taken 500ms after detection
             if(!cameraButton.isEnabled){
@@ -340,13 +362,8 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener {
 
     override fun onEnableCameraButton(enable: Boolean) {
 
-        if(!cameraButton.isEnabled){
-            cameraButton.isEnabled = enable
-            onEnableButton(enable)
-        } else {
-            cameraButton.isEnabled = enable
-            onEnableButton(enable)
-        }
+        cameraButton.isEnabled = enable
+
 
     }
 }
